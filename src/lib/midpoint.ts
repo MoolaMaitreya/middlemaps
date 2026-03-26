@@ -37,8 +37,6 @@ export function calculateGeographicCenter(locations: Location[]): Location {
 
 /**
  * Generate a grid of candidate points around a center location.
- * Returns an array of locations in a gridSize x gridSize grid
- * with the given spacing in kilometers.
  */
 function generateCandidateGrid(
   center: Location,
@@ -48,7 +46,6 @@ function generateCandidateGrid(
   const candidates: Location[] = [];
   const offset = Math.floor(gridSize / 2);
 
-  // Approximate degrees per km at the given latitude
   const kmPerDegreeLat = 111.32;
   const kmPerDegreeLng = 111.32 * Math.cos((center.lat * Math.PI) / 180);
 
@@ -68,9 +65,6 @@ function generateCandidateGrid(
   return candidates;
 }
 
-/**
- * Format a distance in meters to a human-readable string.
- */
 function formatDistance(meters: number): string {
   if (meters < 1000) {
     return `${Math.round(meters)} m`;
@@ -78,9 +72,6 @@ function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`;
 }
 
-/**
- * Format a duration in seconds to a human-readable string.
- */
 function formatDuration(seconds: number): string {
   if (seconds < 3600) {
     return `${Math.round(seconds / 60)} mins`;
@@ -93,8 +84,6 @@ function formatDuration(seconds: number): string {
 /**
  * Call the OSRM Table API to get travel times from multiple origins to a
  * single destination, each with its own transport mode.
- *
- * OSRM coordinates are longitude,latitude (note the order).
  */
 export async function calculateTravelTimes(
   origins: Location[],
@@ -105,7 +94,6 @@ export async function calculateTravelTimes(
     throw new Error('Origins and modes arrays must have the same length');
   }
 
-  // Group origins by transport mode so we make one OSRM request per profile.
   const modeGroups = new Map<TransportMode, number[]>();
   modes.forEach((mode, index) => {
     const group = modeGroups.get(mode) || [];
@@ -119,16 +107,13 @@ export async function calculateTravelTimes(
     async ([mode, indices]) => {
       const profile = MODE_TO_OSRM_PROFILE[mode];
 
-      // Build coordinates string: origins first, then destination last.
-      // OSRM expects lng,lat order.
       const coords = indices
         .map((i) => `${origins[i].lng},${origins[i].lat}`)
         .concat(`${destination.lng},${destination.lat}`)
         .join(';');
 
-      // sources = indices of origins (0..n-1), destinations = index of destination (n)
       const sourceIndices = indices.map((_, i) => i).join(';');
-      const destIndex = indices.length; // last coordinate
+      const destIndex = indices.length;
 
       const url =
         `${OSRM_BASE_URL}/table/v1/${profile}/${coords}` +
@@ -146,14 +131,11 @@ export async function calculateTravelTimes(
         throw new Error(`OSRM Table API returned code: ${data.code}`);
       }
 
-      // durations[i][0] = seconds from origins[i] to destination
-      // distances[i][0] = meters from origins[i] to destination
       indices.forEach((originalIndex, rowIndex) => {
         const duration = data.durations?.[rowIndex]?.[0];
         const distance = data.distances?.[rowIndex]?.[0];
 
         if (duration === null || duration === undefined) {
-          // No route found — assign penalty values
           results[originalIndex] = {
             participantId: '',
             participantName: '',
@@ -180,10 +162,80 @@ export async function calculateTravelTimes(
 }
 
 /**
- * Score a candidate point based on travel times from all participants.
- * Lower score = more fair (smaller difference between longest and shortest travel).
- * Returns the maximum travel time difference between any two participants.
+ * Batch-evaluate multiple candidate destinations in a single OSRM Table call
+ * per transport mode. Returns durations[candidateIndex][originIndex] in seconds.
+ *
+ * This is much faster than evaluating candidates one at a time because it makes
+ * only 1 API call per unique transport mode instead of 1 per candidate.
  */
+async function batchEvaluateCandidates(
+  participants: Participant[],
+  candidates: Location[]
+): Promise<number[][]> {
+  // Group participants by mode
+  const modeGroups = new Map<TransportMode, number[]>();
+  participants.forEach((p, i) => {
+    const group = modeGroups.get(p.transportMode) || [];
+    group.push(i);
+    modeGroups.set(p.transportMode, group);
+  });
+
+  // result[candidateIdx][participantIdx] = duration seconds
+  const result: number[][] = candidates.map(() =>
+    new Array(participants.length).fill(Infinity)
+  );
+
+  const requests = Array.from(modeGroups.entries()).map(
+    async ([mode, participantIndices]) => {
+      const profile = MODE_TO_OSRM_PROFILE[mode];
+
+      // Coordinates: participants in this group first, then all candidates
+      const coords = [
+        ...participantIndices.map(
+          (i) => `${participants[i].location.lng},${participants[i].location.lat}`
+        ),
+        ...candidates.map((c) => `${c.lng},${c.lat}`),
+      ].join(';');
+
+      const numSources = participantIndices.length;
+      const sourceIndices = participantIndices.map((_, i) => i).join(';');
+      const destIndices = candidates
+        .map((_, i) => i + numSources)
+        .join(';');
+
+      const url =
+        `${OSRM_BASE_URL}/table/v1/${profile}/${coords}` +
+        `?sources=${sourceIndices}&destinations=${destIndices}` +
+        `&annotations=duration`;
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`OSRM Table API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (data.code !== 'Ok') {
+        throw new Error(`OSRM Table API returned code: ${data.code}`);
+      }
+
+      // data.durations[sourceRow][destCol]
+      // sourceRow = index in participantIndices
+      // destCol = candidate index
+      participantIndices.forEach((origParticipantIdx, sourceRow) => {
+        candidates.forEach((_, candIdx) => {
+          const dur = data.durations?.[sourceRow]?.[candIdx];
+          if (dur !== null && dur !== undefined) {
+            result[candIdx][origParticipantIdx] = dur;
+          }
+        });
+      });
+    }
+  );
+
+  await Promise.all(requests);
+  return result;
+}
+
 function scoreCandidateByFairness(travelTimes: number[]): number {
   const validTimes = travelTimes.filter((t) => t !== Infinity);
   if (validTimes.length < 2) return Infinity;
@@ -194,33 +246,11 @@ function scoreCandidateByFairness(travelTimes: number[]): number {
 }
 
 /**
- * Get travel times from all participants to a single candidate point.
- * Returns an array of duration values in seconds.
- */
-async function getTravelTimesToCandidate(
-  participants: Participant[],
-  candidate: Location
-): Promise<number[]> {
-  const origins = participants.map((p) => p.location);
-  const modes = participants.map((p) => p.transportMode);
-
-  const travelTimes = await calculateTravelTimes(origins, candidate, modes);
-
-  return travelTimes.map((t) => t.durationSeconds);
-}
-
-/**
  * Find the optimal midpoint for a set of participants by iteratively
  * searching candidate grids and refining around the best candidate.
  *
- * Algorithm:
- *  1. Start with the geographic center of all participant locations.
- *  2. Generate a 3x3 grid of candidate points around the center (~2km spacing).
- *  3. For each candidate, query the OSRM Table API for travel times.
- *  4. Score each candidate by the max difference in travel times.
- *  5. Pick the best candidate, then refine with a tighter grid.
- *  6. Repeat refinement for a total of 2 iterations.
- *  7. Return the optimal midpoint with fairness stats.
+ * Uses batched OSRM Table calls so each iteration only makes 1 API call
+ * per unique transport mode (typically 1-2 calls total per iteration).
  */
 export async function findOptimalMidpoint(
   participants: Participant[]
@@ -229,42 +259,43 @@ export async function findOptimalMidpoint(
     throw new Error('At least two participants are required');
   }
 
-  // Step 1: Geographic center as the starting point
   const locations = participants.map((p) => p.location);
   let center = calculateGeographicCenter(locations);
 
-  // Iteration parameters: start with ~2km spacing, then refine
   const iterations = [
     { spacingKm: 2.0, gridSize: 3 },
     { spacingKm: 0.5, gridSize: 3 },
   ];
 
   for (const { spacingKm, gridSize } of iterations) {
-    // Step 2: Generate candidate grid
     const candidates = generateCandidateGrid(center, spacingKm, gridSize);
 
-    // Step 3 & 4: Evaluate each candidate
+    // Batch-evaluate ALL candidates in 1 OSRM call per transport mode
+    const allTimes = await batchEvaluateCandidates(participants, candidates);
+
     let bestScore = Infinity;
     let bestCandidate = center;
 
-    for (const candidate of candidates) {
-      const times = await getTravelTimesToCandidate(participants, candidate);
-      const score = scoreCandidateByFairness(times);
-
+    for (let i = 0; i < candidates.length; i++) {
+      const score = scoreCandidateByFairness(allTimes[i]);
       if (score < bestScore) {
         bestScore = score;
-        bestCandidate = candidate;
+        bestCandidate = candidates[i];
       }
     }
 
-    // Step 5: Refine around the best candidate
     center = bestCandidate;
   }
 
-  // Step 6: Get final travel times for the optimal midpoint
-  const finalTimes = await getTravelTimesToCandidate(participants, center);
+  // Final travel times for the winning midpoint
+  const origins = participants.map((p) => p.location);
+  const modes = participants.map((p) => p.transportMode);
+  const finalTravelTimes = await calculateTravelTimes(origins, center, modes);
 
-  const validTimes = finalTimes.filter((t) => t !== Infinity);
+  const validTimes = finalTravelTimes
+    .map((t) => t.durationSeconds)
+    .filter((t) => t !== Infinity);
+
   const maxDiff =
     validTimes.length >= 2
       ? Math.max(...validTimes) - Math.min(...validTimes)
