@@ -17,6 +17,7 @@ export default function Home() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSearchingVenues, setIsSearchingVenues] = useState(false);
   const [venueFilter, setVenueFilter] = useState<VenueFilter>({ category: 'any' });
+  const [error, setError] = useState<string | null>(null);
 
   function handleAddParticipant(name: string, location: Location, transportMode: TransportMode) {
     const participant: Participant = {
@@ -27,6 +28,7 @@ export default function Home() {
       color: PARTICIPANT_COLORS[participants.length % PARTICIPANT_COLORS.length],
     };
     setParticipants((prev) => [...prev, participant]);
+    setError(null);
 
     if (midpointResult) {
       setMidpointResult(null);
@@ -40,12 +42,14 @@ export default function Home() {
     setMidpointResult(null);
     setVenues([]);
     setSelectedVenue(null);
+    setError(null);
   }
 
   async function handleSearchVenues(filter?: VenueFilter) {
     if (!midpointResult) return;
 
     setIsSearchingVenues(true);
+    setError(null);
     try {
       const res = await fetch('/api/venues', {
         method: 'POST',
@@ -58,11 +62,13 @@ export default function Home() {
       });
       if (res.ok) {
         const data = await res.json();
-        setVenues(data.venues ?? data);
+        setVenues(Array.isArray(data) ? data : data.venues ?? []);
       } else {
-        console.error('Failed to search venues:', res.statusText);
+        const errData = await res.json().catch(() => null);
+        setError(errData?.error || `Venue search failed (${res.status})`);
       }
     } catch (err) {
+      setError('Network error searching venues. Please try again.');
       console.error('Error searching venues:', err);
     } finally {
       setIsSearchingVenues(false);
@@ -73,18 +79,23 @@ export default function Home() {
     if (participants.length < 2) return;
 
     setIsCalculating(true);
+    setError(null);
+    setVenues([]);
+    setSelectedVenue(null);
+
     try {
       const res = await fetch('/api/midpoint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ participants }),
       });
+
       if (res.ok) {
         const data: MidpointResult = await res.json();
         setMidpointResult(data);
-        setSelectedVenue(null);
+        setIsCalculating(false);
 
-        // Auto-search venues after finding midpoint
+        // Auto-search venues
         setIsSearchingVenues(true);
         try {
           const venueRes = await fetch('/api/venues', {
@@ -98,9 +109,10 @@ export default function Home() {
           });
           if (venueRes.ok) {
             const venueData = await venueRes.json();
-            setVenues(venueData.venues ?? venueData);
+            setVenues(Array.isArray(venueData) ? venueData : venueData.venues ?? []);
           } else {
-            console.error('Failed to search venues:', venueRes.statusText);
+            const errData = await venueRes.json().catch(() => null);
+            console.error('Venue search error:', errData?.error);
           }
         } catch (err) {
           console.error('Error searching venues:', err);
@@ -108,11 +120,13 @@ export default function Home() {
           setIsSearchingVenues(false);
         }
       } else {
-        console.error('Failed to find midpoint:', res.statusText);
+        const errData = await res.json().catch(() => null);
+        setError(errData?.error || `Midpoint calculation failed (${res.status})`);
+        setIsCalculating(false);
       }
     } catch (err) {
+      setError('Network error. Please check your connection and try again.');
       console.error('Error finding midpoint:', err);
-    } finally {
       setIsCalculating(false);
     }
   }
@@ -138,6 +152,13 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-white">MiddleMaps</h1>
             <p className="text-sm text-slate-400">Find the perfect meeting spot</p>
           </div>
+
+          {/* Error banner */}
+          {error && (
+            <div className="mx-6 mt-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+              {error}
+            </div>
+          )}
 
           {/* Participant Panel */}
           <div className="px-6 py-4">

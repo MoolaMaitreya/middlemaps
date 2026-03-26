@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { Participant } from '@/types';
 import { findOptimalMidpoint } from '@/lib/midpoint';
 
+// Allow up to 30s for Vercel serverless functions
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
