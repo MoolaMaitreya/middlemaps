@@ -6,8 +6,11 @@ import type { Participant, Location, Venue } from '@/types';
 const MapView = dynamic(() => import('./MapView'), {
   ssr: false,
   loading: () => (
-    <div className="h-full w-full flex items-center justify-center bg-slate-900">
-      <div className="text-slate-400">Loading map...</div>
+    <div className="h-full w-full flex flex-col items-center justify-center bg-[var(--background)]">
+      <div className="relative mb-3">
+        <div className="w-10 h-10 rounded-full border-2 border-violet-500/20 border-t-violet-400 animate-spin" />
+      </div>
+      <span className="text-sm text-slate-500">Loading map...</span>
     </div>
   ),
 });

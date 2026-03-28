@@ -126,7 +126,6 @@ export default function LocationInput({
     [isOpen, results, highlightedIndex, selectResult],
   );
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -141,7 +140,6 @@ export default function LocationInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Clean up debounce timeout on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -152,19 +150,17 @@ export default function LocationInput({
     <div ref={containerRef} className="relative w-full">
       {/* Search icon */}
       <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
-        <svg
-          className="w-4 h-4 text-slate-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-          />
-        </svg>
+        {isLoading ? (
+          <svg className="w-3.5 h-3.5 text-violet-400 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : (
+          <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        )}
       </div>
 
       <input
@@ -174,7 +170,7 @@ export default function LocationInput({
         onChange={(e) => handleInputChange(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full pl-9 pr-9 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500 transition-all duration-200"
+        className="w-full pl-9 pr-9 py-2 bg-slate-800/60 border border-[var(--border-light)] rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 transition-all duration-200"
         autoComplete="off"
       />
 
@@ -183,35 +179,29 @@ export default function LocationInput({
         <button
           type="button"
           onClick={handleClear}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       )}
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-lg overflow-hidden z-50">
+        <div className="absolute top-full left-0 right-0 mt-1.5 bg-slate-800 border border-[var(--border-light)] rounded-xl shadow-xl shadow-black/30 overflow-hidden z-50 animate-slide-down">
           {isLoading && results.length === 0 && (
-            <div className="px-3 py-2.5 text-sm text-slate-400">
-              Searching...
+            <div className="px-3 py-3 flex items-center gap-2">
+              <svg className="w-3.5 h-3.5 text-violet-400 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-sm text-slate-400">Searching...</span>
             </div>
           )}
 
           {!isLoading && results.length === 0 && (
-            <div className="px-3 py-2.5 text-sm text-slate-400">
+            <div className="px-3 py-3 text-sm text-slate-500">
               No results found
             </div>
           )}
@@ -221,11 +211,17 @@ export default function LocationInput({
               key={result.place_id}
               onClick={() => selectResult(result)}
               onMouseEnter={() => setHighlightedIndex(index)}
-              className={`px-3 py-2.5 text-sm text-slate-200 hover:bg-slate-700 cursor-pointer border-b border-slate-700 last:border-b-0 ${
-                index === highlightedIndex ? 'bg-slate-700' : ''
+              className={`px-3 py-2.5 text-sm cursor-pointer border-b border-[var(--border)] last:border-b-0 flex items-start gap-2.5 transition-colors duration-100 ${
+                index === highlightedIndex
+                  ? 'bg-violet-500/10 text-slate-100'
+                  : 'text-slate-300 hover:bg-slate-700/50'
               }`}
             >
-              <span className="line-clamp-2">{result.display_name}</span>
+              <svg className="w-3.5 h-3.5 text-slate-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="line-clamp-2 text-[13px] leading-snug">{result.display_name}</span>
             </div>
           ))}
         </div>

@@ -14,14 +14,12 @@ interface MapViewProps {
   selectedVenue?: Venue | null;
 }
 
-// --- Custom marker icon creators ---
-
 function createParticipantIcon(color: string, name: string) {
   return L.divIcon({
     html: `
       <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%)">
-        <div style="background:${color};color:#fff;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${name}</div>
-        <div style="width:12px;height:12px;background:${color};border:2px solid #fff;border-radius:50%;margin-top:2px;box-shadow:0 2px 4px rgba(0,0,0,0.3)"></div>
+        <div style="background:${color};color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 2px 8px ${color}40;letter-spacing:0.01em">${name}</div>
+        <div style="width:10px;height:10px;background:${color};border:2px solid #fff;border-radius:50%;margin-top:3px;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>
       </div>
     `,
     className: '',
@@ -34,9 +32,9 @@ function createMidpointIcon() {
   return L.divIcon({
     html: `
       <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%)">
-        <div style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.3)">Midpoint</div>
-        <div style="width:32px;height:32px;background:#f59e0b;border:2px solid #fff;border-radius:50%;margin-top:2px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.3)">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <div style="background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 12px rgba(245,158,11,0.4);letter-spacing:0.01em">Midpoint</div>
+        <div style="width:28px;height:28px;background:linear-gradient(135deg,#f59e0b,#fbbf24);border:2px solid #fff;border-radius:50%;margin-top:3px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(245,158,11,0.4)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
         </div>
       </div>
     `,
@@ -47,12 +45,12 @@ function createMidpointIcon() {
 }
 
 function createVenueIcon(isSelected: boolean, name: string) {
-  const size = isSelected ? 28 : 20;
+  const size = isSelected ? 26 : 18;
   return L.divIcon({
     html: `
       <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%)">
-        ${isSelected ? `<div style="background:#8b5cf6;color:#fff;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 4px rgba(0,0,0,0.3);margin-bottom:2px">${name}</div>` : ''}
-        <div style="width:${size}px;height:${size}px;background:${isSelected ? '#8b5cf6' : '#475569'};border:2px solid ${isSelected ? '#fff' : '#94a3b8'};border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(0,0,0,0.3);transition:all 0.2s">
+        ${isSelected ? `<div style="background:#8b5cf6;color:#fff;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 10px rgba(139,92,246,0.4);margin-bottom:3px;letter-spacing:0.01em">${name}</div>` : ''}
+        <div style="width:${size}px;height:${size}px;background:${isSelected ? '#8b5cf6' : '#64748b'};border:2px solid ${isSelected ? '#fff' : '#94a3b8'};border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:all 0.2s">
           <svg width="${size - 8}" height="${size - 8}" viewBox="0 0 24 24" fill="#fff"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
         </div>
       </div>
@@ -62,8 +60,6 @@ function createVenueIcon(isSelected: boolean, name: string) {
     iconAnchor: [0, 0],
   });
 }
-
-// --- Internal sub-components ---
 
 function MapBoundsController({
   participants,
@@ -108,8 +104,6 @@ function MapClickHandler({ onClick }: { onClick?: (location: Location) => void }
   return null;
 }
 
-// --- Main component ---
-
 export default function MapView({
   participants,
   midpoint,
@@ -118,7 +112,7 @@ export default function MapView({
   selectedVenue,
 }: MapViewProps) {
   return (
-    <div className="relative h-full w-full rounded-xl overflow-hidden border border-slate-700/50">
+    <div className="relative h-full w-full overflow-hidden">
       <MapContainer
         center={[DEFAULT_CENTER.lat, DEFAULT_CENTER.lng]}
         zoom={DEFAULT_ZOOM}
@@ -137,7 +131,6 @@ export default function MapView({
         />
         <MapClickHandler onClick={onMapClick} />
 
-        {/* Participant markers */}
         {participants.map((p) => (
           <Marker
             key={p.id}
@@ -146,7 +139,6 @@ export default function MapView({
           />
         ))}
 
-        {/* Midpoint marker */}
         {midpoint && (
           <Marker
             position={[midpoint.lat, midpoint.lng]}
@@ -154,7 +146,6 @@ export default function MapView({
           />
         )}
 
-        {/* Venue markers */}
         {venues.map((v) => (
           <Marker
             key={v.placeId}
@@ -167,22 +158,22 @@ export default function MapView({
         ))}
       </MapContainer>
 
-      {/* Map legend overlay */}
+      {/* Legend overlay */}
       {participants.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-[1000] bg-slate-900/90 backdrop-blur-sm rounded-lg px-3 py-2 border border-slate-700/50">
-          <div className="flex items-center gap-3 text-xs text-slate-400">
+        <div className="absolute bottom-4 left-4 z-[1000] glass rounded-xl px-3 py-2 border border-[var(--border)]">
+          <div className="flex items-center gap-3 text-[11px] text-slate-400">
             {participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-1">
+              <div key={p.id} className="flex items-center gap-1.5">
                 <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: p.color }}
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: p.color, boxShadow: `0 0 4px ${p.color}60` }}
                 />
                 <span>{p.name}</span>
               </div>
             ))}
             {midpoint && (
-              <div className="flex items-center gap-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-amber-500" style={{ boxShadow: '0 0 4px rgba(245,158,11,0.6)' }} />
                 <span>Midpoint</span>
               </div>
             )}
